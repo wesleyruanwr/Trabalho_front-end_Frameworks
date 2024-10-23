@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import Flatpickr from "react-flatpickr";
+import "flatpickr/dist/themes/material_green.css";
 import Modal from "react-modal";
 
 export default function Budgets() {
@@ -6,106 +8,81 @@ export default function Budgets() {
   const [isEditMode, setIsEditMode] = useState(false); 
   const [instituicao, setInstituicao] = useState(''); 
   const [tipo, setTipo] = useState('');
-  const [rendimento, setRendimento] = useState(''); // Rendimento mensal em %
+  const [rendimento, setRendimento] = useState(''); 
   const [datavencimento, setDataVencimento] = useState('');
   const [valor, setValor] = useState(0);
   const [despesas, setDespesas] = useState([]);
   const [editIndex, setEditIndex] = useState(null); 
 
   useEffect(() => {
-    // Carrega as despesas do localStorage quando o componente monta
     const despesasSalvas = localStorage.getItem('despesas');
     if (despesasSalvas) {
         setDespesas(JSON.parse(despesasSalvas));
     }
   }, []);
 
-
   const summary = despesas.reduce((acc, despesa) => {
     acc.entradas += 1;
     acc.total += despesa.valor;
-    
-    // Calcula o tempo de investimento em meses
-    const mesesInvestidos = calcularMesesInvestidos(despesa.data, datavencimento);
-    console.log(mesesInvestidos)
-    console.log(typeof despesa.data)
-    console.log(despesa.data)
-
-    // Adiciona o rendimento acumulado
-    acc.saidas += calcularRendimento(despesa, mesesInvestidos);
+    const mesesInvestidos = calcularMesesInvestidos(despesa.datavencimento);
+    acc.saidas += calcularRendimento(despesa.valor, despesa.rendimento, mesesInvestidos);
     return acc;
   }, {
     entradas: 0,
-    saidas: 0, // Rendimento total acumulado
+    saidas: 0,
     total: 0
   });
 
- // Função para calcular o rendimento estimado usando juros compostos
-function calcularRendimento(valorInicial, rendimentoMensal, meses) {
-  const rendimentoDecimal = rendimentoMensal / 100; // Converter rendimento para decimal
-  return valorInicial * Math.pow(1 + rendimentoDecimal, meses);
-}
-
-function calcularMesesInvestidos(dataVencimento) {
-  const dataAtual = new Date();
-  
-  // Divide a dataVencimento em dia, mês e ano
-  const [dia, mes, ano] = dataVencimento.split('/').map(Number);
-  
-  // Cria um objeto Date a partir dos componentes
-  const dataFinal = new Date(ano, mes - 1, dia); // mês é 0-indexed
-
-  // Calcula a diferença em milissegundos
-  const diffEmMilissegundos = dataAtual - dataFinal;
-
-  // Converte a diferença em meses
-  const mesesInvestidos = Math.floor(diffEmMilissegundos / (1000 * 60 * 60 * 24 * 30)); // Aproximadamente 30 dias por mês
-  
-  return mesesInvestidos;
-}
-
-
-// Atualização da função `submitForm` para garantir valores corretos
-function submitForm() {
-  const meses = calcularMesesInvestidos(datavencimento);
-  const rendimentoEstimado = calcularRendimento(
-    parseFloat(valor),  // Certificar que 'valor' seja número
-    parseFloat(rendimento),  // Certificar que 'rendimento' seja número
-    meses
-  );
-
-  const novaDespesa = {
-    instituicao,
-    valor: parseFloat(valor),  // Certificar que 'valor' seja número
-    tipo,
-    rendimento: parseFloat(rendimento),  // Certificar que 'rendimento' seja número
-    datavencimento,
-    data: new Date().toLocaleDateString(),
-    rendimentoEstimado: rendimentoEstimado.toFixed(2)  // Armazenar o rendimento estimado calculado
-  };
-
-  let novasDespesas;
-  if (isEditMode) {
-    novasDespesas = despesas.map((item, index) =>
-      index === editIndex ? novaDespesa : item
-    );
-  } else {
-    novasDespesas = [...despesas, novaDespesa];
+  function calcularRendimento(valorInicial, rendimentoMensal, meses) {
+    if (isNaN(valorInicial) || isNaN(rendimentoMensal) || isNaN(meses)) {
+      return 0;
+    }
+    const rendimentoDecimal = rendimentoMensal / 100;
+    return valorInicial * Math.pow(1 + rendimentoDecimal, meses);
   }
 
-  setDespesas(novasDespesas);
-  resetForm();
+  function calcularMesesInvestidos(dataVencimento) {
+    const dataAtual = new Date();
+    const dataFinal = new Date(dataVencimento.split('/').reverse().join('-'));
+    const mesesInvestidos = (dataFinal.getFullYear() - dataAtual.getFullYear()) * 12 + (dataFinal.getMonth() - dataAtual.getMonth());
+    return mesesInvestidos < 0 ? 0 : mesesInvestidos;
+  }
 
-  // Salva as despesas no LocalStorage
-  localStorage.setItem("despesas", JSON.stringify(novasDespesas));
-}
+  function submitForm() {
+    const meses = calcularMesesInvestidos(datavencimento);
+    const rendimentoEstimado = calcularRendimento(
+      parseFloat(valor),
+      parseFloat(rendimento),
+      meses
+    );
 
+    const novaDespesa = {
+      instituicao,
+      valor: parseFloat(valor),
+      tipo,
+      rendimento: parseFloat(rendimento),
+      datavencimento,
+      data: new Date().toLocaleDateString(),
+      rendimentoEstimado: rendimentoEstimado.toFixed(2)
+    };
+
+    let novasDespesas;
+    if (isEditMode) {
+      novasDespesas = despesas.map((item, index) =>
+        index === editIndex ? novaDespesa : item
+      );
+    } else {
+      novasDespesas = [...despesas, novaDespesa];
+    }
+
+    setDespesas(novasDespesas);
+    resetForm();
+    localStorage.setItem("despesas", JSON.stringify(novasDespesas));
+  }
 
   function deleteDespesa(index) {
     const novasDespesas = despesas.filter((_, i) => i !== index);
     setDespesas(novasDespesas);
-
-    // Salva as despesas no LocalStorage
     localStorage.setItem('despesas', JSON.stringify(novasDespesas));
   }
 
@@ -157,7 +134,7 @@ function submitForm() {
         </label>
         <label>Tipo</label>
         <div className="flex gap-4 mt-1">
-        <input 
+          <input 
             className="py-2 px-3 outline-none border border-gray-300 mt-1 rounded"
             type="text"
             value={tipo}
@@ -180,15 +157,18 @@ function submitForm() {
 
         <label>Data de Vencimento</label>
         <div className="flex gap-4 mt-1">
-        <input 
-          className="py-2 px-3 outline-none border border-gray-300 mt-1 rounded"
-          type="text" // Mude de "date" para "text"
-          value={datavencimento}
-          placeholder="DD/MM/AAAA" // Adicione um placeholder para guiar o usuário
-          onChange={(ev) => setDataVencimento(ev.target.value)}
-        />
+          <Flatpickr
+            className="py-2 px-3 outline-none border border-gray-300 mt-1 rounded"
+            value={datavencimento ? new Date(datavencimento.split('/').reverse().join('-')) : null}
+            onChange={(date) => {
+              setDataVencimento(date[0].toLocaleDateString("pt-BR"));
+            }}
+            options={{
+              dateFormat: "d/m/Y",
+            }}
+            placeholder="DD/MM/AAAA"
+          />
         </div>
-
 
         <label className="flex flex-col my-2">
           Valor
@@ -206,12 +186,11 @@ function submitForm() {
           className="p-3 bg-green-500 rounded text-white mt-4"
           onClick={() => submitForm()}
         >
-          {isEditMode ? 'Atualizar Transação' : 'Nova Transação'}
+          {isEditMode ? 'Atualizar Investimento' : 'Novo Investimento'}
         </button>
       </Modal>
       <section className="h-60 bg-emerald-600 pt-8">
         <div className="max-w-5xl mx-auto flex justify-between">
-          
           <h1 className="text-white text-4xl font-semibold">Investimentos</h1>
           <button
             className="flex items-center gap-2 rounded p-2 bg-emerald-500 text-white"
@@ -225,23 +204,22 @@ function submitForm() {
         </div>
       </section> 
       <section className="max-w-5xl mx-auto">
-        <div className="max-w-5xl mx-auto flex gap-5 h-[120px] -mt-[60px]">
-          <div className="flex flex-col flex-1 bg-gray-100 rounded border-gray-300 shadow-md shadow-gray-300 p-3 justify-between">
-            <div className="flex justify-between items-center">
-            <div className="flex justify-between items-center">
-                <h2 className="text-gray-500">Total Investido</h2>
-              </div>
-              <span className="text-3xl font-semibold">R$ {summary.total.toFixed(2)}</span>
-            </div>
-          </div>
-          <div className="flex flex-col flex-1 bg-gray-100 rounded border-gray-300 shadow-md shadow-gray-300 p-3 justify-between">
-            <div className="flex justify-between items-center">
-              <h2 className="text-gray-500">Rendimento Estimado</h2>
-            </div>
-            <span className="text-3xl font-semibold">R$ {summary.saidas.toFixed(2)}</span>
-          </div>
-        </div>
-      </section>
+  <div className="max-w-5xl mx-auto flex gap-5 h-[120px] -mt-[60px]">
+    <div className="flex flex-col flex-1 bg-gray-100 rounded border-gray-300 shadow-md shadow-gray-300 p-3 justify-between">
+      <div className="flex justify-between items-center">
+        <h2 className="text-gray-500">Total Investido</h2>
+        <span className="text-3xl font-semibold">R$ {summary.total.toFixed(2)}</span>
+      </div>
+    </div>
+    <div className="flex flex-col flex-1 bg-gray-100 rounded border-gray-300 shadow-md shadow-gray-300 p-3 justify-between">
+      <div className="flex justify-between items-center">
+        <h2 className="text-gray-500">Rendimento Estimado</h2>
+        <span className="text-3xl font-semibold">R$ {summary.saidas.toFixed(2)}</span>
+      </div>
+    </div>
+  </div>
+</section>
+
       <section className="max-w-5xl mx-auto mt-6">
         {despesas.length === 0 ? (
           <p className="text-center text-gray-500">Nenhum investimento cadastrado.</p>
@@ -288,4 +266,3 @@ function submitForm() {
     </main>
   );
 }
-
