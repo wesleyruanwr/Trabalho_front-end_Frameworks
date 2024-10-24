@@ -122,7 +122,7 @@ export default function Budgets() {
             <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
           </svg>
         </button>
-        <h2 className="text-3xl mb-4">{isEditMode ? 'Editar Transação' : 'Criar novo investimento'}</h2>
+        <h2 className="text-3xl mb-4">{isEditMode ? 'Editar Investimento' : 'Criar novo investimento'}</h2>
         <label className="flex flex-col mb-2">
           Instituição
           <input 
